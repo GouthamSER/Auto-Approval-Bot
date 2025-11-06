@@ -5,6 +5,7 @@ from pyrogram.errors.exceptions.flood_420 import FloodWait
 from database import add_user, add_group, all_users, all_groups, users, remove_user
 from configs import cfg
 import random, asyncio
+from aiohttp import web
 
 app = Client(
     "approver",
@@ -12,6 +13,14 @@ app = Client(
     api_hash=cfg.API_HASH,
     bot_token=cfg.BOT_TOKEN
 )
+#---------------------------------koyeb health---------------------------------------
+# AioHTTP app for health check
+aio_app = web.Application()
+
+async def health(request):
+    return web.Response(text="OK")
+
+aio_app.router.add_get('/health', health)
 
 #━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Main process ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -74,7 +83,7 @@ async def chk(_, cb : CallbackQuery):
             InlineKeyboardButton("💬 Support", url="https://t.me/+53lB8qzQaGFlNDll")
         ]]
     )
-    add_user(m.from_user.id)
+    add_user(cb.from_user.id)  # Fixed: was m.from_user.id, should be cb.from_user.id
     await cb.edit_text(text="**🦊 Hello {}!\nI'm an auto approve [Admin Join Requests]({}) Bot.\nI can approve users in Groups/Channels.\nAdd me to your chat and promote me to admin with add members permission.\n\n__Powered By : @im_goutham_josh __**".format(cb.from_user.mention, "https://t.me/telegram/153"), reply_markup=keyboard)
     
 
@@ -155,5 +164,19 @@ async def fcast(_, m : Message):
 
     await lel.edit(f"✅Successfull to `{success}` users.\n❌ Faild to `{failed}` users.\n👾 Found `{blocked}` Blocked users \n👻 Found `{deactivated}` Deactivated users.")
 
-print("I'm Alive Now!")
-app.run()
+async def main():
+    # Start aiohttp server for health check
+    runner = web.AppRunner(aio_app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)  # Adjust port if needed
+    await site.start()
+    print("AioHTTP health server started on port 8080")
+
+    # Start the bot
+    await app.start()
+    print("Bot started")
+    await app.idle()
+    await app.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
