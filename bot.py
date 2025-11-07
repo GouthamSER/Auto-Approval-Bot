@@ -168,15 +168,14 @@ async def main():
     # Start aiohttp server for health check
     runner = web.AppRunner(aio_app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)  # Adjust port if needed
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
     print("AioHTTP health server started on port 8080")
 
-    # Start the bot
-    await app.start()
-    print("Bot started")
-    await app.idle()
-    await app.stop()
+    # Start the bot properly
+    async with app:
+        print("Bot started")
+        await asyncio.Event().wait()  # Keeps it running
 
 if __name__ == "__main__":
     asyncio.run(main())
