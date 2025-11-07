@@ -4,7 +4,8 @@ from pyrogram.errors import UserNotParticipant
 from pyrogram.errors.exceptions.flood_420 import FloodWait
 from database import add_user, add_group, all_users, all_groups, users, remove_user
 from configs import cfg
-import random, asyncio
+import random, asyncio, threading
+from aiohttp import web
 
 app = Client(
     "approver",
@@ -12,6 +13,26 @@ app = Client(
     api_hash=cfg.API_HASH,
     bot_token=cfg.BOT_TOKEN
 )
+
+#---------------------------------koyeb health---------------------------------------
+# AioHTTP app for health check
+aio_app = web.Application()
+
+async def health(request):
+    return web.Response(text="OK")
+
+aio_app.router.add_get('/health', health)
+
+def start_aiohttp():
+    # Run aiohttp server in a separate thread to avoid blocking app.run()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    runner = web.AppRunner(aio_app)
+    loop.run_until_complete(runner.setup())
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    loop.run_until_complete(site.start())
+    print("AioHTTP health server started on port 8080")
+    loop.run_forever()
 
 #━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Main process ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -74,11 +95,11 @@ async def chk(_, cb : CallbackQuery):
             InlineKeyboardButton("💬 Support", url="https://t.me/+53lB8qzQaGFlNDll")
         ]]
     )
-    add_user(m.from_user.id)
+    add_user(cb.from_user.id)  # Fixed: was m.from_user.id, should be cb.from_user.id
     await cb.edit_text(text="**🦊 Hello {}!\nI'm an auto approve [Admin Join Requests]({}) Bot.\nI can approve users in Groups/Channels.\nAdd me to your chat and promote me to admin with add members permission.\n\n__Powered By : @im_goutham_josh __**".format(cb.from_user.mention, "https://t.me/telegram/153"), reply_markup=keyboard)
     
 
-#━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ info ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ info ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @app.on_message(filters.command("stats") & filters.user(cfg.SUDO))
 async def dbtool(_, m : Message):
@@ -105,12 +126,12 @@ async def bcast(_, m : Message):
         try:
             userid = usrs["user_id"]
             #print(int(userid))
-            if m.command[0] == "bcast":
+            if m.command[0] == "broadcast":  # Fixed: was "bcast", should match command
                 await m.reply_to_message.copy(int(userid))
             success +=1
         except FloodWait as ex:
             await asyncio.sleep(ex.value)
-            if m.command[0] == "bcast":
+            if m.command[0] == "broadcast":  # Fixed: was "bcast", should match command
                 await m.reply_to_message.copy(int(userid))
         except errors.InputUserDeactivated:
             deactivated +=1
@@ -123,7 +144,7 @@ async def bcast(_, m : Message):
 
     await lel.edit(f"✅Successfull to `{success}` users.\n❌ Faild to `{failed}` users.\n👾 Found `{blocked}` Blocked users \n👻 Found `{deactivated}` Deactivated users.")
 
-#━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Broadcast Forward ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Broadcast Forward ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @app.on_message(filters.command("forwardcast") & filters.user(cfg.SUDO))
 async def fcast(_, m : Message):
@@ -137,12 +158,12 @@ async def fcast(_, m : Message):
         try:
             userid = usrs["user_id"]
             #print(int(userid))
-            if m.command[0] == "fcast":
+            if m.command[0] == "forwardcast":  # Fixed: was "fcast", should match command
                 await m.reply_to_message.forward(int(userid))
             success +=1
         except FloodWait as ex:
             await asyncio.sleep(ex.value)
-            if m.command[0] == "fcast":
+            if m.command[0] == "forwardcast":  # Fixed: was "fcast", should match command
                 await m.reply_to_message.forward(int(userid))
         except errors.InputUserDeactivated:
             deactivated +=1
@@ -154,6 +175,9 @@ async def fcast(_, m : Message):
             failed +=1
 
     await lel.edit(f"✅Successfull to `{success}` users.\n❌ Faild to `{failed}` users.\n👾 Found `{blocked}` Blocked users \n👻 Found `{deactivated}` Deactivated users.")
+
+# Start the aiohttp health server in a separate thread before running the bot
+threading.Thread(target=start_aiohttp, daemon=True).start()
 
 print("I'm Alive Now!")
 app.run()
